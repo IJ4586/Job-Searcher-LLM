@@ -314,7 +314,7 @@ class LLMError(Exception):
     pass
 
 
-def ask(s: Settings, prompt: str, timeout: float = 240):
+def ask(s: Settings, prompt: str, timeout: float = 240, max_tokens: int | None = None):
     try:
         r = httpx.post(f"{s.ollama_url.rstrip('/')}/api/chat", timeout=timeout, json={
             "model": model_name(s),
@@ -322,10 +322,16 @@ def ask(s: Settings, prompt: str, timeout: float = 240):
             "stream": False,
             "format": "json",
             "keep_alive": "30m" if s.keep_loaded else "5m",
-            "options": {"temperature": s.temperature, "num_ctx": s.num_ctx, "num_predict": s.max_tokens},
+            "options": {"temperature": s.temperature, "num_ctx": s.num_ctx,
+                        "num_predict": max_tokens or s.max_tokens},
         })
         r.raise_for_status()
-        return json.loads(r.json()["message"]["content"])
+        body = r.json()
+        content = (body.get("message") or {}).get("content", "")
+        if not content.strip():
+            print("EMPTY REPLY FROM OLLAMA:", body)
+            raise ValueError(f"The model returned an empty reply (done_reason={body.get('done_reason')})")
+        return json.loads(content)
     except Exception as e:  # network, HTTP, or the model returned non-JSON
         raise LLMError(str(e)) from e
 
@@ -418,7 +424,7 @@ RESUME:
 {text[:12000]}"""
     s = get_settings()
     try:
-        out = ask(s, prompt, timeout=300)
+        out = ask(s, prompt, timeout=300, max_tokens=4096)
     except LLMError as e:
         raise HTTPException(502, f"The local model could not read the resume: {e}")
     return Experience.model_validate(out)
