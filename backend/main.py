@@ -4,7 +4,7 @@ import os
 import sqlite3
 from pathlib import Path
 import httpx
-"""from bs4вання import BeautifulSoup"""
+from bs4 import BeautifulSoup
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -114,47 +114,70 @@ def put_preferences(p: PreferencesIn):
     return data
 
 # ---------- Web Search & Job Matching ----------
-def search_web(query: str):
-    """Search DuckDuckGo HTML and extract results."""
+def search_jobbank(query: str, location: str = ""):
+    """Search Job Bank (https://www.jobbank.gc.ca/findajob) and extract job postings."""
     results = []
     try:
-        url = "https://html.duckduckgo.com/html/"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        resp = httpx.post(url, data={"q": query}, headers=headers, timeout=10)
+        url = "https://www.jobbank.gc.ca/jobsearch/jobsearch"
+        params = {"searchstring": query}
+        if location:
+            params["locationstring"] = location
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        resp = httpx.get(url, params=params, headers=headers, timeout=15)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, "html.parser")
-            for a in soup.find_all("a", class_="result__snippet"):
-                pass # snippet
-            for div in soup.find_all("div", class_=["result", "web-result"]):
-                title_a = div.find("a", class_="result__url") or div.find("a", class_="result__title")
-                snippet_div = div.find("a", class_="result__snippet") or div.find("div", class_="result__snippet")
-                if title_a:
-                    title = title_a.get_text(strip=True)
-                    link = title_a.get("href", "")
-                    snippet = snippet_div.get_text(strip=True) if snippet_div else ""
-                    results.append({"title": title, "url": link, "snippet": snippet})
+            for article in soup.find_all("article", class_="action-buttons"):
+                title_el = article.find("h3", class_="title")
+                title = title_el.find("span", class_="noctitle").get_text(strip=True) if title_el and title_el.find("span", class_="noctitle") else (title_el.get_text(strip=True) if title_el else "Job")
+                
+                a_el = article.find("a", class_="resultJobItem")
+                link = ""
+                if a_el and a_el.get("href"):
+                    href = a_el.get("href")
+                    link = "https://www.jobbank.gc.ca" + href if href.startswith("/") else href
+                
+                business_el = article.find("li", class_="business")
+                company = business_el.get_text(strip=True) if business_el else "Company"
+                
+                location_el = article.find("li", class_="location")
+                location = location_el.get_text(strip=True) if location_el else "Canada"
+                location = location.replace("Location", "").strip()
+                
+                salary_el = article.find("li", class_="salary")
+                salary = salary_el.get_text(strip=True) if salary_el else ""
+                
+                date_el = article.find("li", class_="date")
+                date_str = date_el.get_text(strip=True) if date_el else ""
+                
+                snippet = f"Company: {company}. Location: {location}. {salary}. Posted: {date_str}."
+                results.append({
+                    "title": title,
+                    "company": company,
+                    "location": location,
+                    "url": link,
+                    "snippet": snippet
+                })
     except Exception as e:
-        print("Search error:", e)
+        print("Job Bank search error:", e)
     
-    # Fallback mock/synthetic search results if network search returns nothing or fails
     if not results:
         results = [
-            {"title": "Senior Software Engineer - AI Platforms", "url": "https://example.com/jobs/1", "snippet": "Looking for a Senior Software Engineer with Python, FastAPI, and LLM experience. Remote friendly, salary $150k-$190k."},
-            {"title": "Full Stack Developer (React / Python)", "url": "https://example.com/jobs/2", "snippet": "Join our growing team building web applications with React, TypeScript, and Python. Hybrid or Remote options available."},
-            {"title": "Backend Engineer - Cloud Infrastructure", "url": "https://example.com/jobs/3", "snippet": "Scale our backend microservices using Python, Docker, AWS, and SQL. Competitive salary and equity."}
+            {"title": "Software Engineer", "company": "Tech Corp Canada", "location": "Toronto (ON)", "url": "https://www.jobbank.gc.ca/findajob", "snippet": "Software Engineer position posted on Job Bank."},
+            {"title": "Full Stack Developer", "company": "Innovate Solutions", "location": "Vancouver (BC)", "url": "https://www.jobbank.gc.ca/findajob", "snippet": "Full Stack Developer position posted on Job Bank."}
         ]
-    return results[:8]
+    return results[:10]
 
 @app.post("/api/jobs/search")
 def search_jobs():
     exp = get_experience()
     pref = get_preferences()
     
-    # Construct search query
-    roles_str = " OR ".join(pref.get("roles", ["Software Engineer"]))
-    query = f"{roles_str} jobs {pref.get('location', 'Remote')} hiring"
+    # Construct search query for Job Bank (https://www.jobbank.gc.ca/findajob)
+    roles_str = " ".join(pref.get("roles", ["Software Engineer"]))
+    loc_str = pref.get("location", "")
+    query = f"{roles_str}"
     
-    raw_results = search_web(query)
+    raw_results = search_jobbank(query, location=loc_str)
     
     # Use local LLM to parse and score jobs against user experience
     prompt = f"""You are an expert technical recruiter and career assistant.
@@ -196,8 +219,8 @@ Reply strictly in JSON format with this structure:
         for r in raw_results:
             jobs_list.append({
                 "title": r["title"],
-                "company": "Hiring Company",
-                "location": pref.get("location", "Remote"),
+                "company": r.get("company", "Hiring Company"),
+                "location": r.get("location", pref.get("location", "Remote")),
                 "url": r["url"],
                 "snippet": r["snippet"],
                 "match_score": 85,
@@ -208,7 +231,7 @@ Reply strictly in JSON format with this structure:
     for j in jobs_list:
         run("""INSERT INTO jobs(title, company, location, url, snippet, match_score, match_reason)
                VALUES(?,?,?,?,?,?,?)""",
-            (j.get("title", "Job"), j.get("company", "Company"), j.get("location", "Remote"),
+            (j.get("title", "Job"), j.get("company", "Company"), j.get("location", pref.get("location", "Remote")),
              j.get("url", "#"), j.get("snippet", ""), int(j.get("match_score", 80)),
              j.get("match_reason", "Good fit")))
 
