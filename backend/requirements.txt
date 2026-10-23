@@ -2,5 +2,6 @@ fastapi
 uvicorn[standard]
 python-multipart
 httpx
-pillow
 beautifulsoup4
+pypdf
+python-docx
