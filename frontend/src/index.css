@@ -1,18 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;0,6..96,800;1,6..96,400&family=Cormorant+Garamond:ital,wght@0,400;1,400;1,500&family=Libre+Franklin:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-display: 'Bodoni Moda', 'Didot', serif;
-  --font-deck: 'Cormorant Garamond', Georgia, serif;
-  --font-sans: 'Libre Franklin', system-ui, sans-serif;
-  --color-paper: #f3efe6;
-  --color-ink: #111111;
-  --color-oxblood: #7a1f2b;
-  --color-rule: #cfc8b8;
-  --color-mute: #6b665c;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  --color-ground: #e2e2e2;
+  --color-panel: #f4f4f4;
+  --color-ink: #0b0b0b;
+  --color-accent: #00c9ff;
+  --color-body: #2b2b2b;
+  --color-subtle: #454545;
+  --color-danger: #a8001a;
+  --color-ok: #0f7b3a;
+  --color-warn: #b45309;
+
+  --shadow-hard: 6px 6px 0 0 #0b0b0b;
+  --shadow-hard-sm: 4px 4px 0 0 #0b0b0b;
 }
 
-body { margin: 0; background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
-select, input { border-radius: 0; }
-@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.rise { animation: rise .6s cubic-bezier(.2,.7,.2,1) both; }
+/* In the base layer so Tailwind utilities can still override these. */
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+  }
+  input, select, textarea, button { border-radius: 0; font: inherit; }
+  :focus-visible { outline: 3px solid var(--color-ink); outline-offset: 2px; }
+  input[type='checkbox'], input[type='range'] { accent-color: var(--color-ink); }
+  ::selection { background: var(--color-accent); color: var(--color-ink); }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.9s linear infinite; }
