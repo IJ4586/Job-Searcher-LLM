@@ -15,6 +15,7 @@ If the model is not reachable, searches still run and fall back to keyword scori
 
 You'll need [Ollama](https://ollama.com), Python 3.10+, and Node.js 20+.
 
+*bash*
 ```bash
 # 1. Get the model (one time, large download). Any Ollama chat model works;
 #    you can pick another one later in Settings.
@@ -28,6 +29,25 @@ uvicorn main:app --reload
 
 # 3. In a second terminal, start the app
 cd frontend
+npm install
+npm run dev -- --host
+```
+*powershell*
+```powershell
+# 1. Get the model
+ollama pull gemma4:e4b
+
+# 2. Start the backend
+# Follow this forum post for "Microsoft C++ Build Tools": https://tinyurl.com/bdev44v7
+# The 'python -m pip install -r requirements.txt' command will fail to execute if c++ build tools are not installed 
+cd 'C:...\Job-Searcher-LLM\backend'
+python -m venv .venv
+.\.venv\scripts\activate.ps1
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --reload
+
+# 3. In a second terminal, start the app
+cd 'C:...\Job-Searcher-LLM\frontend'
 npm install
 npm run dev -- --host
 ```
